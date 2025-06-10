@@ -4,6 +4,12 @@
 
 Adafruit_BME280 bme;  // I2C interface
 
+// Function prototypes
+float readTemperature();
+float readHumidity();
+float readPressure();
+void displayReadings(float temperature, float humidity, float pressure);
+
 void setup() 
 {
   Serial.begin(9600);
