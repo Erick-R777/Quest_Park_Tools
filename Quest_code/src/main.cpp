@@ -6,66 +6,85 @@
 
 SoftwareSerial WaveSerial(RX, TX);
 
-// Presence tracking
-bool previousPresence = false;
-bool currentPresence = false;
-unsigned long lastDetectionTime = 0;
-int presenceCount = 0;
+// Instelbare afstandslimieten (in centimeter)
+const int MIN_DISTANCE = 50;
+const int MAX_DISTANCE = 200;
 
+bool previousPresence = false;  // Vorige aanwezigheid
+bool currentPresence = false;   // Huidige aanwezigheid
+int presenceCount = 0;          // Totaal aantal personen
+
+unsigned long lastPrintTime = 0;            // Tijdstip laatste statusprint
+const unsigned long printInterval = 1000;   // 1 seconde tussen statusprints
+
+// Functieprototypes
+void checkSensorData();
+void detectNewPerson();
+void printStatus();
 
 void setup() 
 {
   Serial.begin(115200);
   WaveSerial.begin(115200);
-  Serial.println("Starting presence counter...");
+  Serial.println("Sensor gestart...");
 }
-
 
 void loop() 
 {
   checkSensorData();
-  updatePresenceState();
   detectNewPerson();
+  printStatus();
 }
 
-// ---- Function to read sensor data ----
+// Lees afstandsgegevens van de sensor
 void checkSensorData() 
 {
   if (WaveSerial.available()) 
   {
-    // Read the data (we don’t care what it is)
-    WaveSerial.read();
+    String incoming = WaveSerial.readStringUntil('\n');
+    incoming.trim(); // Verwijder eventuele lege spaties
 
-    // Presence is assumed when data is received
-    currentPresence = true;
-    lastDetectionTime = millis();
+    if (incoming.startsWith("Range")) // Afstandsgegevens
+    {
+      int distance = incoming.substring(6).toInt();
+
+      if (distance >= MIN_DISTANCE && distance <= MAX_DISTANCE) 
+      {
+        currentPresence = true;
+      } else 
+      {
+        currentPresence = false;
+      }
+    }
   }
 }
 
-// ---- Function to update presence status based on time ----
-void updatePresenceState() 
-{
-  if (millis() - lastDetectionTime > 500) 
-  {
-    currentPresence = false;
-  }
-}
-
-// ---- Function to detect new person (rising edge) ----
+// Telt alleen nieuwe personen bij overgang van niet aanwezig → aanwezig
 void detectNewPerson() 
 {
   if (currentPresence && !previousPresence) 
   {
     presenceCount++;
-    Serial.print("New person detected! Total count: ");
+    Serial.print("Nieuwe persoon gedetecteerd! Totaal: ");
     Serial.println(presenceCount);
   }
 
-  // Update previous state for next loop
   previousPresence = currentPresence;
 }
 
+// Print 1x per seconde de huidige status (afstand en aanwezigheid)
+void printStatus() 
+{
+  static String lastStatus = ""; // Vorige status
+  if (millis() - lastPrintTime > printInterval) 
+  {
+    lastPrintTime = millis();
 
-
-
-
+    String status = currentPresence ? "Aanwezig binnen afstand" : "Geen aanwezigheid";
+    if (status != lastStatus) 
+    {
+      Serial.println("Status: " + status);
+      lastStatus = status;
+    }
+  }
+}
